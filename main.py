@@ -1,5 +1,7 @@
 import os
+import sys
 import time
+from pathlib import Path
 
 from dotenv import load_dotenv
 from selenium import webdriver
@@ -13,12 +15,50 @@ from selenium.webdriver.common.action_chains import ActionChains
 
 load_dotenv("credenciais.env")
 
-ARQUIVO_PROCESSADOS = "emails_processados.txt"
+ARQUIVO_PROCESSADOS = Path("emails_processados.txt")
+ARQUIVO_LOG = Path("logs") / "bot.log"
 MODO_TESTE = os.getenv("MODO_TESTE", os.getenv("TEST_MODE", "")).strip().lower() in {"1", "true", "sim", "yes"}
 
 
+class TeeOutput:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, mensagem):
+        for stream in self.streams:
+            stream.write(mensagem)
+            stream.flush()
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
+
+
+def configurar_log():
+    ARQUIVO_LOG.parent.mkdir(parents=True, exist_ok=True)
+    log_estava_vazio = not ARQUIVO_LOG.exists() or ARQUIVO_LOG.stat().st_size == 0
+    arquivo_log = open(ARQUIVO_LOG, "a", encoding="utf-8")
+    stdout_original = sys.stdout
+    stderr_original = sys.stderr
+
+    if log_estava_vazio:
+        arquivo_log.write("Log iniciado.\n")
+        arquivo_log.flush()
+
+    sys.stdout = TeeOutput(stdout_original, arquivo_log)
+    sys.stderr = TeeOutput(stderr_original, arquivo_log)
+    return arquivo_log, stdout_original, stderr_original
+
+
+def reiniciar_emails_processados():
+    if ARQUIVO_PROCESSADOS.exists():
+        ARQUIVO_PROCESSADOS.unlink()
+    ARQUIVO_PROCESSADOS.touch()
+    print(f"Arquivo {ARQUIVO_PROCESSADOS} recriado vazio.")
+
+
 def carregar_emails_processados():
-    if not os.path.exists(ARQUIVO_PROCESSADOS):
+    if not ARQUIVO_PROCESSADOS.exists():
         return set()
 
     with open(ARQUIVO_PROCESSADOS, "r", encoding="utf-8") as arquivo:
@@ -592,19 +632,24 @@ def navegar_ate_em_assinatura(driver, wait, primeira_vez=False):
 
 
 def main():
-    chrome_options = Options()
-    chrome_options.add_argument("--start-maximized")
-    chrome_options.add_argument("--incognito")
-
-    driver = webdriver.Chrome(options=chrome_options)
-    wait = WebDriverWait(driver, 20)
+    arquivo_log, stdout_original, stderr_original = configurar_log()
+    driver = None
 
     try:
+        reiniciar_emails_processados()
+
+        chrome_options = Options()
+        chrome_options.add_argument("--start-maximized")
+        chrome_options.add_argument("--incognito")
+
+        driver = webdriver.Chrome(options=chrome_options)
+        wait = WebDriverWait(driver, 20)
+
         url = os.getenv("URL")
         usuario = os.getenv("USUARIO")
         senha = os.getenv("SENHA")
         if not all([url, usuario, senha]):
-            print("Erro: Verifique as credenciais no arquivo .env")
+            print("Erro: Verifique as credenciais no arquivo credenciais.env")
             return
 
         print(f"Acessando: {url}")
@@ -683,7 +728,11 @@ def main():
     except Exception as erro:
         print(f"Erro Critico: {erro}")
     finally:
-        driver.quit()
+        if driver:
+            driver.quit()
+        sys.stdout = stdout_original
+        sys.stderr = stderr_original
+        arquivo_log.close()
 
 
 if __name__ == "__main__":

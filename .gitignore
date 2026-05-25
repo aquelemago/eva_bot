@@ -23,7 +23,11 @@ wheels/
 
 # Environments
 .env
+.env.*
 credenciais.env
+*.env
+!.env.example
+!*.env.example
 venv/
 ENV/
 
@@ -31,3 +35,8 @@ ENV/
 chromedriver
 geckodriver
 ghostdriver.log
+
+# Runtime files
+emails_processados.txt
+logs/
+*.log
