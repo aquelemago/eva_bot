@@ -453,7 +453,7 @@ def obter_usuarios_acoes_lista(driver, imprimir=True):
             .map((elemento) => {
                 const linhas = Array.from(elemento.querySelectorAll(".ui-table-unfrozen-view .ui-table-scrollable-body tbody.ui-table-tbody > tr"))
                     .filter((linha) => linha.querySelector("s-employee-data"));
-                const botoes = Array.from(elemento.querySelectorAll("s-button[data-testid^='pre-admission-list-actions-button-'] button[stieredmenu]"))
+                const botoes = Array.from(elemento.querySelectorAll("button[stieredmenu]"))
                     .filter((botao) => normalizar(botao.innerText || botao.textContent) === 'acoes');
                 return { elemento, linhas, botoes, total: Math.max(linhas.length, botoes.length) };
             })
@@ -463,31 +463,52 @@ def obter_usuarios_acoes_lista(driver, imprimir=True):
             return { usuarios: [], botoes: [] };
         }
 
+        const botaoAcoesVisivel = (botao) => {
+            const rect = botao.getBoundingClientRect();
+            return normalizar(botao.innerText || botao.textContent) === 'acoes'
+                && rect.width > 0
+                && rect.height > 0
+                && !botao.disabled
+                && botao.getAttribute('aria-disabled') !== 'true';
+        };
+
+        const todosBotoesAcoes = Array.from(lista.elemento.querySelectorAll("button[stieredmenu]"))
+            .filter(botaoAcoesVisivel);
+
+        const obterBotaoAcoesDaLinha = (linha) => {
+            const botaoNaLinha = Array.from(linha.querySelectorAll("button[stieredmenu]"))
+                .find(botaoAcoesVisivel);
+            if (botaoNaLinha) {
+                return botaoNaLinha;
+            }
+
+            const rectLinha = linha.getBoundingClientRect();
+            return todosBotoesAcoes.find((botao) => {
+                const rectBotao = botao.getBoundingClientRect();
+                const centroBotao = rectBotao.top + rectBotao.height / 2;
+                return centroBotao >= rectLinha.top - 3 && centroBotao <= rectLinha.bottom + 3;
+            }) || null;
+        };
+
         const usuarios = lista.linhas.map((linha, indice) => {
             const usuario = linha.querySelector("s-employee-data");
             const nome = (usuario.querySelector("[data-testid^='pre-admission-list-employee-name-']")?.innerText || '').trim();
             const infos = Array.from(usuario.querySelectorAll(".person-secondary-info span")).map((span) => (span.innerText || span.textContent || '').trim());
             const email = infos.find((texto) => texto.includes('@')) || '';
-            const wrapper = lista.elemento.querySelector(`s-button[data-testid='pre-admission-list-actions-button-${indice}']`);
-            const botao = wrapper ? wrapper.querySelector("button[stieredmenu]") : null;
+            const botao = obterBotaoAcoesDaLinha(linha);
             return {
                 indice,
                 nome,
                 email,
                 temBotaoAcoes: !!botao,
                 botaoId: botao ? (botao.id || '') : '',
-                dataTestId: wrapper ? (wrapper.getAttribute('data-testid') || '') : ''
+                botaoTexto: botao ? ((botao.innerText || botao.textContent || '').trim()) : ''
             };
         }).filter((usuario) => usuario.email || usuario.nome);
 
-        const botoes = Array.from(lista.elemento.querySelectorAll("s-button[data-testid^='pre-admission-list-actions-button-'] button")).filter((botao) => {
-            const texto = normalizar(botao.innerText || botao.textContent);
-            return botao.hasAttribute('stieredmenu') && texto === 'acoes';
-        }).map((botao) => {
-            const wrapper = botao.closest("s-button[data-testid^='pre-admission-list-actions-button-']");
+        const botoes = todosBotoesAcoes.map((botao) => {
             return {
                 id: botao.id || '',
-                dataTestId: wrapper ? wrapper.getAttribute('data-testid') : '',
                 texto: (botao.innerText || botao.textContent || '').trim()
             };
         });
@@ -506,18 +527,21 @@ def obter_usuarios_acoes_lista(driver, imprimir=True):
             print(
                 f"  Usuario {indice}: indice={usuario.get('indice')}, "
                 f"nome='{usuario.get('nome')}', email='{usuario.get('email')}', "
-                f"botao='{usuario.get('dataTestId')}', id='{usuario.get('botaoId')}', "
+                f"id_botao='{usuario.get('botaoId')}', texto_botao='{usuario.get('botaoTexto')}', "
                 f"temBotaoAcoes={usuario.get('temBotaoAcoes')}"
             )
 
     return usuarios
 
 
-def clicar_acoes_usuario_por_indice(driver, indice):
-    print(f"Procurando botao 'Acoes' do usuario indice {indice}...")
+def clicar_acoes_usuario(driver, usuario):
+    email = (usuario.get("email") or "").strip().lower()
+    nome = (usuario.get("nome") or "").strip()
+    indice = usuario.get("indice")
+    print(f"Procurando botao 'Acoes' do usuario: {nome} <{email}>...")
     botao = driver.execute_script(
         """
-        const indice = arguments[0];
+        const alvo = arguments[0];
         const normalizar = (texto) => (texto || '')
             .normalize('NFD')
             .replace(/[\\u0300-\\u036f]/g, '')
@@ -530,7 +554,7 @@ def clicar_acoes_usuario_por_indice(driver, indice):
             .map((elemento) => {
                 const linhas = Array.from(elemento.querySelectorAll(".ui-table-unfrozen-view .ui-table-scrollable-body tbody.ui-table-tbody > tr"))
                     .filter((linha) => linha.querySelector("s-employee-data"));
-                const botoes = Array.from(elemento.querySelectorAll("s-button[data-testid^='pre-admission-list-actions-button-'] button[stieredmenu]"))
+                const botoes = Array.from(elemento.querySelectorAll("button[stieredmenu]"))
                     .filter((botao) => normalizar(botao.innerText || botao.textContent) === 'acoes');
                 return { elemento, total: Math.max(linhas.length, botoes.length) };
             })
@@ -539,12 +563,61 @@ def clicar_acoes_usuario_por_indice(driver, indice):
         if (!lista) {
             return null;
         }
-        return lista.elemento.querySelector(`s-button[data-testid='pre-admission-list-actions-button-${indice}'] button[stieredmenu]`);
+
+        const linhas = Array.from(lista.elemento.querySelectorAll(".ui-table-unfrozen-view .ui-table-scrollable-body tbody.ui-table-tbody > tr"))
+            .filter((linha) => linha.querySelector("s-employee-data"));
+        const botaoAcoesVisivel = (botao) => {
+            const rect = botao.getBoundingClientRect();
+            return normalizar(botao.innerText || botao.textContent) === 'acoes'
+                && rect.width > 0
+                && rect.height > 0
+                && !botao.disabled
+                && botao.getAttribute('aria-disabled') !== 'true';
+        };
+
+        const todosBotoesAcoes = Array.from(lista.elemento.querySelectorAll("button[stieredmenu]"))
+            .filter(botaoAcoesVisivel);
+
+        const linhaEncontrada = linhas
+            .map((linha, indice) => {
+                const dadosUsuario = linha.querySelector("s-employee-data");
+                const nome = (dadosUsuario.querySelector("[data-testid^='pre-admission-list-employee-name-']")?.innerText || '').trim();
+                const infos = Array.from(dadosUsuario.querySelectorAll(".person-secondary-info span"))
+                    .map((span) => (span.innerText || span.textContent || '').trim());
+                const email = infos.find((texto) => texto.includes('@')) || '';
+                return { linha, indice, nome, email };
+            })
+            .find((item) => {
+                if (alvo.email && item.email && normalizar(item.email) === normalizar(alvo.email)) {
+                    return true;
+                }
+                if (alvo.nome && item.nome && normalizar(item.nome) === normalizar(alvo.nome)) {
+                    return true;
+                }
+                return Number.isInteger(alvo.indice) && item.indice === alvo.indice;
+            });
+
+        if (!linhaEncontrada) {
+            return null;
+        }
+
+        const botaoNaLinha = Array.from(linhaEncontrada.linha.querySelectorAll("button[stieredmenu]"))
+            .find(botaoAcoesVisivel);
+        if (botaoNaLinha) {
+            return botaoNaLinha;
+        }
+
+        const rectLinha = linhaEncontrada.linha.getBoundingClientRect();
+        return todosBotoesAcoes.find((botao) => {
+            const rectBotao = botao.getBoundingClientRect();
+            const centroBotao = rectBotao.top + rectBotao.height / 2;
+            return centroBotao >= rectLinha.top - 3 && centroBotao <= rectLinha.bottom + 3;
+        }) || null;
         """,
-        indice,
+        {"email": email, "nome": nome, "indice": indice},
     )
     if not botao:
-        print(f"Nao encontrei botao Acoes para o usuario indice {indice}.")
+        print(f"Nao encontrei botao Acoes para o usuario {nome} <{email}>.")
         return False
 
     print(
@@ -553,14 +626,14 @@ def clicar_acoes_usuario_por_indice(driver, indice):
         f"class='{botao.get_attribute('class')}', "
         f"texto='{botao.text.strip().replace(chr(10), ' ')}'"
     )
-    return clicar_elemento(driver, botao, f"botao Acoes do usuario {indice}", lambda: menu_visivel(driver, "Detalhar"))
+    return clicar_elemento(driver, botao, f"botao Acoes do usuario {nome or indice}", lambda: menu_visivel(driver, "Detalhar"))
 
 
 def processar_usuario_em_assinatura(driver, usuario, modo_teste=False):
     indice = usuario.get("indice")
     print(f"Processando usuario indice {indice}: {usuario.get('nome')} <{usuario.get('email')}>")
 
-    if not clicar_acoes_usuario_por_indice(driver, indice):
+    if not clicar_acoes_usuario(driver, usuario):
         return False
 
     clicar_item_menu(driver, "Detalhar")
