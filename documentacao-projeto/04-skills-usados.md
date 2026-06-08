@@ -3,6 +3,27 @@
 Esta auditoria seguiu os skills solicitados pelo usuario, sem instalar novas
 skills e sem alterar codigo do projeto.
 
+## Infraestrutura local em 2026-06-08
+
+Foi criada uma infraestrutura local de agente em `.agents/skills/`, com uma
+skill por objetivo:
+
+- `project-discovery`: mapeamento inicial de estrutura e caminhos.
+- `documentation-reader`: leitura integral da base documental principal.
+- `codebase-analyzer`: coleta de evidencias no codigo.
+- `documentation-auditor`: comparacao entre documentacao e codigo.
+- `documentation-writer`: criacao de novos documentos quando houver lacuna.
+- `documentation-updater`: atualizacao de documentos existentes.
+- `ai-agent-readiness`: avaliacao de prontidao para agentes de IA.
+- `documentation-validator`: validacao final de consistencia e restricoes.
+
+Essas skills estao documentadas em arquivos `SKILL.md` dentro de
+`.agents/skills/`. A orientacao geral para agentes fica em `AGENTS.md`.
+
+Observacao de caminho: o diretorio documental oficial e `documentacao-projeto`.
+O caminho incorreto `documenatcao-projeteto` apareceu em instrucoes anteriores
+como erro de digitacao historico.
+
 ## skill-creator
 
 Uso nesta tarefa:

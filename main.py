@@ -377,6 +377,10 @@ def clicar_acoes_documentos(driver, timeout=60):
             for documento in documentos
             if documento["statusNormalizado"] == "em assinatura" and documento["temBotao"]
         ]
+        status_encontrados = sorted({
+            documento.get("status") or "Sem status"
+            for documento in documentos
+        })
 
         print(f"Documentos encontrados: {len(documentos)}")
         for documento in documentos:
@@ -388,6 +392,27 @@ def clicar_acoes_documentos(driver, timeout=60):
                 f"tem_botao_acoes={documento.get('temBotao')}"
             )
         print(f"Documentos com status 'Em assinatura' e botao Acoes: {len(pendentes)}")
+
+        if documentos and not pendentes:
+            status_log = ", ".join(status_encontrados)
+            status_normalizados = [
+                documento.get("statusNormalizado")
+                for documento in documentos
+                if documento.get("statusNormalizado")
+            ]
+            todos_expirados = all(
+                status == "expirado"
+                for status in status_normalizados
+            )
+            if status_normalizados and todos_expirados:
+                print("[SKIP] Usuario ignorado: todos os documentos encontrados estao Expirados.")
+                return "skip_expirado"
+
+            print(
+                "[SKIP] Nenhum documento em assinatura encontrado para este usuario. "
+                f"Status encontrados: {status_log}."
+            )
+            return "skip_sem_documento_acionavel"
 
         for documento in pendentes:
             try:
@@ -402,12 +427,13 @@ def clicar_acoes_documentos(driver, timeout=60):
                 if botao.is_displayed() and botao.is_enabled():
                     if clicar_elemento(driver, botao, "botao Acoes do documento Em assinatura"):
                         print("Botao 'Acoes' do documento em assinatura clicado.")
-                        return True
+                        return "processar"
             except Exception as erro:
                 print(f"Falha ao tentar Acoes do documento em assinatura: {erro}")
         time.sleep(2)
 
-    raise Exception("Nao foi possivel clicar no botao 'Acoes' de documento com status 'Em assinatura'.")
+    print("[SKIP] Nenhum documento em assinatura encontrado para este usuario dentro do timeout.")
+    return "skip_sem_documento_acionavel"
 
 
 def confirmar_reenviar(driver, timeout=60):
@@ -640,7 +666,9 @@ def processar_usuario_em_assinatura(driver, usuario, modo_teste=False):
     clicar_ver_detalhes(driver)
     clicar_documentos_enviados(driver)
     time.sleep(3)
-    clicar_acoes_documentos(driver)
+    status_documentos = clicar_acoes_documentos(driver)
+    if status_documentos != "processar":
+        return status_documentos
 
     if modo_teste:
         if menu_visivel(driver, "Reenviar"):
@@ -652,12 +680,12 @@ def processar_usuario_em_assinatura(driver, usuario, modo_teste=False):
         except Exception:
             pass
         time.sleep(2)
-        return True
+        return "processado"
 
     clicar_item_menu(driver, "Reenviar")
     confirmar_reenviar(driver)
     time.sleep(8)
-    return True
+    return "processado"
 
 
 def navegar_ate_em_assinatura(driver, wait, primeira_vez=False):
@@ -771,18 +799,23 @@ def main():
 
             usuario_atual = usuarios_pendentes[0]
             print(f"\n--- Ciclo {total_processados + 1}: {len(usuarios_pendentes)} usuario(s) pendente(s) nesta tela ---")
-            processou = processar_usuario_em_assinatura(driver, usuario_atual, modo_teste=MODO_TESTE)
+            resultado_processamento = processar_usuario_em_assinatura(driver, usuario_atual, modo_teste=MODO_TESTE)
 
-            if processou:
+            if resultado_processamento in {"processado", "skip_expirado", "skip_sem_documento_acionavel"}:
                 email_normalizado = usuario_atual.get("email").strip().lower()
                 emails_processados.add(email_normalizado)
-                if not MODO_TESTE:
+                if resultado_processamento == "processado" and not MODO_TESTE:
                     registrar_email_processado(email_normalizado)
-                total_processados += 1
                 tentativas_sem_avanco = 0
-                if MODO_TESTE:
+                if resultado_processamento == "skip_expirado":
+                    print("Usuario ignorado nesta execucao por possuir somente documentos expirados.")
+                elif resultado_processamento == "skip_sem_documento_acionavel":
+                    print("Usuario ignorado nesta execucao por nao possuir documento em assinatura acionavel.")
+                elif MODO_TESTE:
+                    total_processados += 1
                     print("Teste do usuario concluido sem reenviar.")
                 else:
+                    total_processados += 1
                     print("Reenvio concluido.")
             else:
                 tentativas_sem_avanco += 1
