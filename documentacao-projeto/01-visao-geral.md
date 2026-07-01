@@ -65,6 +65,6 @@ Pre-condicoes:
 - Escreve logs em `logs/bot.log`.
 - Redireciona `stdout` e `stderr` para console e arquivo de log.
 - Recria `emails_processados.txt` no inicio da execucao.
-- Abre o Chrome em janela maximizada e modo anonimo.
+- Abre o Chrome em modo headless (sem janela visivel) e modo anonimo.
 - Em modo normal, clica em `Reenviar` e confirma o reenvio.
 - Em modo teste, reenvia mas nao registra o email em `emails_processados.txt`.

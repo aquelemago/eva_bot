@@ -21,7 +21,7 @@ reenvio normalmente, mas nao registra o email processado em `emails_processados.
 | 2 | Definir arquivos de runtime e modo de teste | `main.py`, constantes `ARQUIVO_PROCESSADOS`, `ARQUIVO_LOG`, `MODO_TESTE` | Variaveis `MODO_TESTE` ou `TEST_MODE` | Caminhos e modo booleano definidos | Sistema de arquivos, variaveis de ambiente | Valor inesperado de modo de teste |
 | 3 | Configurar log | `configurar_log()` | `logs/bot.log` | `stdout` e `stderr` duplicados para console e log | Permissao de escrita em `logs/` | Falha ao criar diretorio ou abrir arquivo de log |
 | 4 | Reiniciar controle de processados | `reiniciar_emails_processados()` | `emails_processados.txt` existente ou ausente | Arquivo recriado vazio | Sistema de arquivos | Falha de permissao; perda do historico de execucoes anteriores |
-| 5 | Preparar Chrome | `main()` | Opcoes `--start-maximized` e `--incognito` | Instancia `webdriver.Chrome` e `WebDriverWait` | Selenium, Chrome, Selenium Manager/WebDriver | Chrome ausente, driver incompativel, bloqueio do sistema operacional |
+| 5 | Preparar Chrome | `main()` | Opcoes `--headless=new`, `--no-sandbox`, `--disable-dev-shm-usage`, `--window-size=1920,1080` e `--incognito` | Instancia `webdriver.Chrome` e `WebDriverWait` | Selenium, Chrome, Selenium Manager/WebDriver | Chrome ausente, driver incompativel, bloqueio do sistema operacional |
 | 6 | Validar credenciais minimas | `main()` | `URL`, `USUARIO`, `SENHA` | Execucao continua somente se todas existirem | `credenciais.env` | Navegador pode abrir antes da validacao; variavel ausente encerra o fluxo |
 | 7 | Acessar URL e autenticar | `main()` | URL, usuario, senha | Login submetido na pagina | Internet/rede, site Senior X, campos por ID | Timeout, credencial invalida, mudanca nos IDs `username-input-field`, `nextBtn`, `password-input-field`, `loginbtn` |
 | 8 | Fechar popups iniciais | `fechar_popup_se_existir()` | Seletores `a.ui-dialog-titlebar-close`, `em.fas.fa-times` | Popups fechados se existirem | DOM da pagina, Selenium | Popup novo ou seletor alterado pode bloquear fluxo |
@@ -205,7 +205,7 @@ como tratado em memoria nesta execucao.
   `ARQUIVO_LOG = Path("logs") / "bot.log"`.
 - `main.py` interpreta `MODO_TESTE` e `TEST_MODE` como booleano por conjunto de
   valores textuais.
-- `main.py` inicia Chrome com `--start-maximized` e `--incognito`.
+- `main.py` inicia Chrome com `--headless=new`, `--no-sandbox`, `--disable-dev-shm-usage`, `--window-size=1920,1080` e `--incognito`.
 - `main.py` le `URL`, `USUARIO` e `SENHA` antes de acessar o site, mas depois
   de inicializar o Chrome.
 - `main.py` usa os IDs `username-input-field`, `nextBtn`,

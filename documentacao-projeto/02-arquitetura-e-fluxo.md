@@ -51,7 +51,7 @@ Dependencias importadas:
 1. Carrega `credenciais.env`.
 2. Configura log com `TeeOutput`.
 3. Recria `emails_processados.txt`.
-4. Inicia Chrome com `--start-maximized` e `--incognito`.
+4. Inicia Chrome com `--headless=new`, `--window-size=1920,1080` e `--incognito`.
 5. Le `URL`, `USUARIO` e `SENHA`.
 6. Acessa a URL e realiza login por IDs:
    - `username-input-field`

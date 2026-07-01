@@ -73,6 +73,14 @@ Resultado observado durante a auditoria: sem entradas retornadas.
    em `emails_processados.txt`. Isso parece intencional para evitar registrar
    processamento real quando nao houve reenvio.
 
+7. Chrome agora executa em modo headless.
+
+   As flags `--start-maximized` foi substituida por `--headless=new`,
+   `--no-sandbox`, `--disable-dev-shm-usage` e `--window-size=1920,1080`.
+   O Chrome funciona sem janela visivel, permitindo execucao em servidores
+   sem interface grafica. O comportamento e identico ao modo com janela,
+   exceto pela ausencia de renderizacao visual.
+
 ## Riscos operacionais
 
 - Reenvio duplicado se a automacao for interrompida antes de registrar o email ou
@@ -80,6 +88,7 @@ Resultado observado durante a auditoria: sem entradas retornadas.
 - Falha por alteracao de layout, texto ou componente do Senior X.
 - Falha por popup novo nao coberto pelos seletores atuais.
 - Falha por Chrome/WebDriver incompatavel ou sem permissao no ambiente local.
+- Headless pode ser detectado por alguns sites via User-Agent; se o Senior X bloquear, pode ser necessario falsear o User-Agent.
 - Log pode crescer indefinidamente, pois `logs/bot.log` e aberto em modo append.
 
 ## Comandos uteis para diagnostico futuro
