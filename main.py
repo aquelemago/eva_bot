@@ -164,31 +164,35 @@ def clicar_elemento(driver, elemento, descricao, verificacao=None):
             time.sleep(2)
             if verificacao is None or verificacao():
                 return True
-            print(f"{nome} executado, mas a verificacao esperada ainda nao apareceu.")
         except Exception as erro:
             print(f"Falhou {nome}: {erro}")
 
     return False
 
 
-def clicar_aba_em_assinatura(driver):
+def clicar_aba_em_assinatura(driver, timeout=30):
     seletores = [
         ("link da aba", By.XPATH, "//li[@role='presentation'][.//span[contains(normalize-space(), 'Em assinatura')]]//a[@role='tab']"),
-        ("span da aba", By.XPATH, "//span[contains(normalize-space(), 'Em assinatura')]"),
         ("qualquer tab", By.XPATH, "//*[@role='tab' and contains(normalize-space(), 'Em assinatura')]"),
+        ("span da aba", By.XPATH, "//span[contains(normalize-space(), 'Em assinatura')]"),
     ]
 
-    for descricao, by, seletor in seletores:
-        elementos = driver.find_elements(by, seletor)
-        print(f"Seletor aba '{descricao}' encontrou {len(elementos)} elemento(s).")
-        for elemento in elementos:
-            try:
-                if elemento.is_displayed() and clicar_elemento(driver, elemento, f"aba Em assinatura ({descricao})"):
-                    time.sleep(5)
-                    return True
-            except Exception as erro:
-                print(f"Falhou ao clicar aba com '{descricao}': {erro}")
+    fim = time.time() + timeout
+    while time.time() < fim:
+        for descricao, by, seletor in seletores:
+            elementos = driver.find_elements(by, seletor)
+            if elementos:
+                print(f"Seletor aba '{descricao}' encontrou {len(elementos)} elemento(s).")
+            for elemento in elementos:
+                try:
+                    if elemento.is_displayed() and clicar_elemento(driver, elemento, f"aba Em assinatura ({descricao})"):
+                        time.sleep(5)
+                        return True
+                except Exception as erro:
+                    print(f"Falhou ao clicar aba com '{descricao}': {erro}")
+        time.sleep(1)
 
+    print("Nao foi possivel clicar na aba 'Em assinatura' dentro do timeout.")
     return False
 
 
@@ -282,8 +286,10 @@ def clicar_ver_detalhes(driver, timeout=60):
 def clicar_documentos_enviados(driver, timeout=60):
     print("Aguardando aba 'Documentos enviados' aparecer...")
     seletores = [
-        ("role tab", By.XPATH, "//a[@role='tab' and .//span[contains(@class, 'ui-tabview-title') and normalize-space()='Documentos enviados']]"),
-        ("span da aba", By.XPATH, "//span[contains(@class, 'ui-tabview-title') and normalize-space()='Documentos enviados']"),
+        ("ui-tabview-header", By.XPATH, "//a[contains(@class, 'ui-tabview-header') and .//span[normalize-space()='Documentos enviados']]"),
+        ("role tab", By.XPATH, "//a[@role='tab' and .//span[normalize-space()='Documentos enviados']]"),
+        ("span direto", By.XPATH, "//span[normalize-space()='Documentos enviados']"),
+        ("li header", By.XPATH, "//li[contains(@class, 'ui-tabview-header') and .//span[normalize-space()='Documentos enviados']]"),
     ]
 
     fim = time.time() + timeout
@@ -296,7 +302,7 @@ def clicar_documentos_enviados(driver, timeout=60):
                             print("Aba 'Documentos enviados' clicada.")
                             return True
                 except Exception as erro:
-                    print(f"Falha ao tentar Documentos enviados com '{descricao}': {erro}")
+                    print(f"Falha ao tentar aba Documentos enviados com '{descricao}': {erro}")
         time.sleep(2)
 
     raise Exception("Nao foi possivel clicar na aba 'Documentos enviados'.")
@@ -353,20 +359,35 @@ def clicar_acoes_documentos(driver, timeout=60):
                 .trim()
                 .toLowerCase();
 
-            return Array.from(document.querySelectorAll("p-treetable tbody.ui-treetable-tbody > tr"))
+            const painelDocumentos = document.querySelector(
+                'div[role="tabpanel"]:not(.ui-helper-hidden), ' +
+                '.ui-tabview-panel:not(.ui-helper-hidden)'
+            );
+            const tabelaDocumentos = painelDocumentos
+                ? painelDocumentos.querySelector('p-table, .ui-table, table')
+                : null;
+            const linhas = tabelaDocumentos
+                ? Array.from(tabelaDocumentos.querySelectorAll('tbody.ui-table-tbody > tr, tbody > tr'))
+                : Array.from(document.querySelectorAll('p-table tbody.ui-table-tbody > tr, table tbody > tr'));
+
+            return linhas
                 .map((linha, indice) => {
                     const celulas = Array.from(linha.querySelectorAll(":scope > td"));
                     const status = Array.from(linha.querySelectorAll("s-badge span"))
                         .map((span) => (span.innerText || span.textContent || '').trim())
                         .find(Boolean) || '';
-                    const botao = linha.querySelector("button[id^='btn-actions-pre-admission-documents'][stieredmenu]");
+                    const botao = linha.querySelector("button[stieredmenu]");
+                    const textoBotao = botao
+                        ? normalizar(botao.innerText || botao.textContent)
+                        : '';
                     return {
                         indice,
                         titulo: (celulas[0]?.innerText || '').trim(),
                         status,
                         statusNormalizado: normalizar(status),
                         botao,
-                        temBotao: Boolean(botao),
+                        temBotao: Boolean(botao) && textoBotao === 'acoes',
+                        botaoTexto: textoBotao,
                     };
                 })
                 .filter((documento) => documento.status || documento.temBotao);
@@ -449,9 +470,6 @@ def confirmar_reenviar(driver, timeout=60):
         for descricao, by, seletor in seletores:
             for botao in driver.find_elements(by, seletor):
                 try:
-                    texto = botao.text.strip()
-                    if "Reenviar" not in texto:
-                        continue
                     if botao.is_displayed() and botao.is_enabled():
                         if clicar_elemento(driver, botao, f"confirmacao Reenviar ({descricao})"):
                             print("Confirmacao 'Reenviar' clicada.")
@@ -670,18 +688,6 @@ def processar_usuario_em_assinatura(driver, usuario, modo_teste=False):
     if status_documentos != "processar":
         return status_documentos
 
-    if modo_teste:
-        if menu_visivel(driver, "Reenviar"):
-            print("MODO TESTE: item 'Reenviar' apareceu. Nao vou clicar nem confirmar o reenvio.")
-        else:
-            print("MODO TESTE: botao Acoes do documento abriu, mas o item 'Reenviar' nao ficou visivel.")
-        try:
-            driver.switch_to.active_element.send_keys(Keys.ESCAPE)
-        except Exception:
-            pass
-        time.sleep(2)
-        return "processado"
-
     clicar_item_menu(driver, "Reenviar")
     confirmar_reenviar(driver)
     time.sleep(8)
@@ -715,13 +721,7 @@ def navegar_ate_em_assinatura(driver, wait, primeira_vez=False):
     fechar_popup_se_existir(driver, "div.close-modal", timeout=2, nome="Popup pos-aba tipo 3")
 
     if not clicar_aba_em_assinatura(driver):
-        print("Clique direto na aba falhou. Tentando fallback por teclado...")
-        actions = ActionChains(driver)
-        for _ in range(15):
-            actions.send_keys(Keys.TAB)
-        actions.send_keys(Keys.ENTER)
-        actions.perform()
-        time.sleep(5)
+        print("Nao foi possivel clicar na aba 'Em assinatura'. Verifique se o nome da aba mudou.")
 
     fechar_popup_se_existir(driver, "button.close-popup", timeout=5, nome="Popup pos-aba tipo 1")
     fechar_popup_se_existir(driver, ".ui-dialog-titlebar-close", timeout=2, nome="Popup pos-aba tipo 2")
@@ -774,8 +774,6 @@ def main():
         total_processados = 0
         emails_processados = carregar_emails_processados()
         tentativas_sem_avanco = 0
-        if MODO_TESTE:
-            print("MODO TESTE ATIVO: o fluxo sera validado sem clicar em 'Reenviar'.")
         print(f"Emails ja registrados como processados: {len(emails_processados)}")
 
         while True:
@@ -811,9 +809,6 @@ def main():
                     print("Usuario ignorado nesta execucao por possuir somente documentos expirados.")
                 elif resultado_processamento == "skip_sem_documento_acionavel":
                     print("Usuario ignorado nesta execucao por nao possuir documento em assinatura acionavel.")
-                elif MODO_TESTE:
-                    total_processados += 1
-                    print("Teste do usuario concluido sem reenviar.")
                 else:
                     total_processados += 1
                     print("Reenvio concluido.")

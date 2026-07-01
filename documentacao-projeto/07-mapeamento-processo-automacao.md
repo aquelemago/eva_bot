@@ -10,8 +10,8 @@ o Senior X / HCM, navega ate `Admissao Digital > Pre-admissoes`, entra na aba
 cada usuario, acessa `Documentos enviados`, localiza documentos com status
 `Em assinatura` e, em modo normal, executa `Reenviar` e confirma a acao.
 
-Em modo de teste, controlado por `MODO_TESTE` ou `TEST_MODE`, o script valida o
-fluxo ate a opcao `Reenviar`, mas nao clica nem confirma o reenvio.
+Em modo de teste, controlado por `MODO_TESTE` ou `TEST_MODE`, o script executa o
+reenvio normalmente, mas nao registra o email processado em `emails_processados.txt`.
 
 ## 2. Fluxo principal
 
@@ -101,11 +101,11 @@ fluxo ate a opcao `Reenviar`, mas nao clica nem confirma o reenvio.
                       ↓
                     [Abrir Acoes do documento]
                       ↓
-                    {MODO_TESTE ativo?}
-                      ├─ Sim → [Validar Reenviar sem clicar]
-                      └─ Nao → [Clicar Reenviar e confirmar]
-                           ↓
-                    [Registrar email processado em memoria e, no modo normal, no arquivo]
+                     [Clicar Reenviar e confirmar]
+                       ↓
+                     {MODO_TESTE ativo?}
+                       ├─ Sim → [Registrar email apenas em memoria]
+                       └─ Nao → [Registrar email em memoria e no arquivo]
                       ↓
                     [Atualizar pagina e voltar para Em assinatura]
                       ↓
@@ -116,7 +116,7 @@ fluxo ate a opcao `Reenviar`, mas nao clica nem confirma o reenvio.
 
 | Ponto de decisao | Condicao | Caminho A | Caminho B | Risco |
 | ---------------- | -------- | --------- | --------- | ----- |
-| Modo de teste | `MODO_TESTE` ou `TEST_MODE` em `{"1", "true", "sim", "yes"}` | Valida ate `Reenviar`, nao confirma | Executa `Reenviar` e confirma | Valor errado pode causar reenvio real ou impedir teste |
+| Modo de teste | `MODO_TESTE` ou `TEST_MODE` em `{"1", "true", "sim", "yes"}` | Reenvia mas nao registra email no arquivo | Reenvia e registra email em `emails_processados.txt` | Valor errado pode nao filtrar reenvio real ou impedir teste |
 | Log inicial | `logs/bot.log` existe e tem tamanho maior que zero | Apenas abre em append | Escreve `Log iniciado.` | Log cresce indefinidamente |
 | Controle de processados | `emails_processados.txt` existe | Arquivo e removido e recriado | Arquivo e criado | Historico entre execucoes e perdido |
 | Credenciais minimas | `URL`, `USUARIO`, `SENHA` existem | Continua login | Registra erro e finaliza | Chrome ja foi aberto antes dessa validacao |

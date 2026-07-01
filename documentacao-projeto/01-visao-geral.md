@@ -7,8 +7,8 @@ percorrer a area de admissao digital, localizar pre-admissoes na aba
 `Em assinatura` e reenviar documentos com status `Em assinatura`.
 
 O fluxo tambem possui um modo de teste controlado por variavel de ambiente. Em
-modo de teste, o script valida ate o ponto em que a opcao `Reenviar` aparece,
-mas nao clica em `Reenviar` nem confirma o reenvio.
+modo de teste, o script executa o reenvio normalmente, mas nao registra o email
+processado em `emails_processados.txt`.
 
 ## Arquivos do projeto
 
@@ -67,4 +67,4 @@ Pre-condicoes:
 - Recria `emails_processados.txt` no inicio da execucao.
 - Abre o Chrome em janela maximizada e modo anonimo.
 - Em modo normal, clica em `Reenviar` e confirma o reenvio.
-- Em modo teste, nao confirma reenvio.
+- Em modo teste, reenvia mas nao registra o email em `emails_processados.txt`.

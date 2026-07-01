@@ -36,8 +36,10 @@ Dependencias importadas:
 - `confirmar_reenviar(driver)`: confirma a acao `Reenviar`.
 - `obter_usuarios_acoes_lista(driver)`: executa JavaScript para extrair usuarios
   e botoes `Acoes` da lista.
-- `clicar_acoes_usuario_por_indice(driver, indice)`: clica no botao `Acoes` de
+- `clicar_acoes_usuario(driver, usuario)`: clica no botao `Acoes` de
   um usuario especifico.
+- `menu_visivel(driver, texto)`: verifica se um item de menu com o texto
+  fornecido esta visivel na tela.
 - `processar_usuario_em_assinatura(driver, usuario, modo_teste=False)`: executa
   o fluxo de detalhes, documentos enviados e reenvio para um usuario.
 - `navegar_ate_em_assinatura(driver, wait, primeira_vez=False)`: navega ate a
@@ -72,7 +74,7 @@ Dependencias importadas:
     - abre `Documentos enviados`;
     - localiza documento com status `Em assinatura`;
     - abre `Acoes` do documento;
-    - em modo teste, para antes do reenvio;
+    - em modo teste, reenvia mas nao registra o email em `emails_processados.txt`;
     - em modo normal, clica `Reenviar` e confirma.
 14. Atualiza a pagina e volta para `Em assinatura`.
 15. Finaliza quando nao ha usuarios, nao ha pendentes ou ha 3 ciclos sem avanco.
