@@ -23,9 +23,6 @@ import win32serviceutil
 import win32service
 import win32event
 
-from main import main, sinalizar_parada
-
-
 HORARIO_EXECUCAO = 7
 
 
@@ -43,6 +40,7 @@ class EvabotService(win32serviceutil.ServiceFramework):
         self._running = True
 
     def SvcStop(self):
+        from main import sinalizar_parada
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
         self._running = False
         sinalizar_parada()
@@ -56,6 +54,7 @@ class EvabotService(win32serviceutil.ServiceFramework):
         return False
 
     def _executar_bot(self):
+        from main import main, sinalizar_parada
         thread = threading.Thread(target=main, daemon=True)
         thread.start()
         while thread.is_alive():
