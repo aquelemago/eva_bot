@@ -113,22 +113,29 @@ Dependencias adicionais em `windows_service.py`:
     ou a parada foi solicitada.
 17. Fecha o navegador no `finally`.
 
-## Execucao como Servico do Windows
+## Execucao como Servico do Windows (com agendamento)
 
-Quando executado via `windows_service.py`, o fluxo e:
+Quando executado via `windows_service.py`, o servico gerencia o ciclo de vida
+com agendamento diario. O fluxo e:
 
 1. `EvabotService.SvcDoRun()` e chamado pelo Service Control Manager.
-2. Uma thread separada executa `main()` com toda a logica de automacao.
-3. A thread principal fica em loop monitorando:
-   - o evento de parada do SCM (`hWaitStop`);
-   - se a thread do bot ainda esta viva.
-4. Quando o administrador para o servico, `SvcStop()` e chamado:
+2. Calcula o proximo horario de execucao (07:00 do mesmo dia ou do dia
+   seguinte, se ja passou).
+3. Aguarda ate o horario programado, verificando a cada 30s se ha sinal de
+   parada do SCM.
+4. Quando o horario chega, inicia `main()` em uma thread separada.
+5. Enquanto a thread executa, verifica a cada 1s se o servico foi interrompido.
+6. Quando a automacao termina, retorna ao passo 2 e aguarda a proxima
+   execucao (proximo dia as 07:00).
+7. Quando o administrador para o servico (`SvcStop()`):
    - reporta `SERVICE_STOP_PENDING` ao SCM;
    - aciona `sinalizar_parada()` para interromper `main()`;
-   - aciona `hWaitStop` para liberar a thread principal.
-5. A thread principal aguarda a finalizacao da thread do bot (join com 30s de
-   timeout).
-6. O servico e encerrado de forma limpa.
+   - aciona `hWaitStop` para liberar qualquer espera ativa;
+   - aguarda a finalizacao da thread do bot (join com 30s de timeout);
+   - o servico e encerrado de forma limpa.
+
+O servico permanece ativo em segundo plano entre as execucoes, consumindo
+recursos minimos (apenas a espera pelo horario agendado).
 
 ## Seletores importantes
 

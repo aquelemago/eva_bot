@@ -80,5 +80,6 @@ Pre-condicoes:
 - Abre o Chrome em modo headless (sem janela visivel) e modo anonimo.
 - Em modo normal, clica em `Reenviar` e confirma o reenvio.
 - Em modo teste, reenvia mas nao registra o email em `emails_processados.txt`.
-- Quando executado como servico, atende ao sinal de parada do SCM: interrompe o
-  loop no proximo ciclo e executa cleanup (fecha Chrome, restaura streams, fecha log).
+- Quando executado como servico, aguarda ate as 07:00, executa o bot, e repete
+  o ciclo diariamente. Atende ao sinal de parada do SCM: interrompe o loop no
+  proximo ciclo e executa cleanup (fecha Chrome, restaura streams, fecha log).

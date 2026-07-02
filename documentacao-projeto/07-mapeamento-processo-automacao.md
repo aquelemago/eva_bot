@@ -156,6 +156,7 @@ reenvio normalmente, mas nao registra o email processado em `emails_processados.
 | `logs/` | `configurar_log()` e diagnostico | Sim para log | Conferir permissao de escrita | Sem log para diagnostico |
 | `emails_processados.txt` | Controle de usuarios processados na execucao | Sim para controle local | Conferir criacao e escrita | Reprocessamento se execucao reinicia |
 | Sistema operacional | Permissoes de arquivo e execucao do Chrome | Sim | Validar escrita em pasta e abertura de navegador | Bloqueio por permissao, antivirus, politicas |
+| Agendamento interno | `windows_service.py`, `_proximo_horario()` | Sim para servico | Calcular horario com `datetime` | Fuso horario incorreto pode deslocar a execucao |
 
 ## 6. Pontos criticos
 
@@ -236,6 +237,9 @@ como tratado em memoria nesta execucao.
   principal, interrompendo o fluxo quando o servico solicita parada.
 - `windows_service.py` implementa `EvabotService` com metodos `SvcStop()` e
   `SvcDoRun()`, controlando o ciclo de vida da automacao como servico Windows.
+- `windows_service.py` agenda a execucao diaria as 07:00 via
+  `_proximo_horario()` e `_aguardar_proximo_horario()`, eliminando a
+  necessidade do Agendador de Tarefas.
 
 ## 9. Hipoteses de causa
 
