@@ -62,8 +62,8 @@ Pre-condicoes:
 
 ## Saidas e efeitos colaterais
 
-- Escreve logs em `logs/bot.log`.
-- Redireciona `stdout` e `stderr` para console e arquivo de log.
+- Escreve logs em `logs/bot.log` com timestamps e separador entre execucoes.
+- Redireciona `stdout` e `stderr` para console e arquivo de log, com timestamps em cada linha.
 - Recria `emails_processados.txt` no inicio da execucao.
 - Abre o Chrome em modo headless (sem janela visivel) e modo anonimo.
 - Em modo normal, clica em `Reenviar` e confirma o reenvio.

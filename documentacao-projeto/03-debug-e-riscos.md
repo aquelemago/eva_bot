@@ -32,6 +32,7 @@ Select-String -Path logs\bot.log -Pattern "Erro|Critico|Falha|Nao foi possivel|T
 ```
 
 Resultado observado durante a auditoria: sem entradas retornadas.
+O log agora contem timestamps `[YYYY-MM-DD HH:MM:SS]` e separadores entre execucoes.
 
 ## Achados de debug estatico
 
@@ -81,6 +82,14 @@ Resultado observado durante a auditoria: sem entradas retornadas.
    sem interface grafica. O comportamento e identico ao modo com janela,
    exceto pela ausencia de renderizacao visual.
 
+8. Logs agora possuem formato profissional com timestamps e separadores.
+
+   O `configurar_log()` foi simplificado: removeu a checagem de "Log iniciado."
+   e agora sempre escreve um cabecalho com separador visual e timestamp da
+   execucao. O `TeeOutput.write()` foi alterado para adicionar
+   `[YYYY-MM-DD HH:MM:SS]` automaticamente em cada linha. No encerramento,
+   o `finally` do `main()` escreve um rodape com "Execucao finalizada em ...".
+
 ## Riscos operacionais
 
 - Reenvio duplicado se a automacao for interrompida antes de registrar o email ou
@@ -90,6 +99,8 @@ Resultado observado durante a auditoria: sem entradas retornadas.
 - Falha por Chrome/WebDriver incompatavel ou sem permissao no ambiente local.
 - Headless pode ser detectado por alguns sites via User-Agent; se o Senior X bloquear, pode ser necessario falsear o User-Agent.
 - Log pode crescer indefinidamente, pois `logs/bot.log` e aberto em modo append.
+  Os separadores entre execucoes e timestamps facilitam a identificacao de
+  cada sessao e a busca por eventos especificos.
 
 ## Comandos uteis para diagnostico futuro
 

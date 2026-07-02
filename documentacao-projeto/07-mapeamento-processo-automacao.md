@@ -19,7 +19,7 @@ reenvio normalmente, mas nao registra o email processado em `emails_processados.
 | ----- | ----- | -------------- | ------- | -------------- | ------------ | ---------------- |
 | 1 | Carregar configuracao de ambiente | `main.py`, `load_dotenv("credenciais.env")` | Arquivo `credenciais.env` | Variaveis disponiveis via `os.getenv` | `python-dotenv`, arquivo local | Arquivo ausente, variaveis vazias, valores incorretos |
 | 2 | Definir arquivos de runtime e modo de teste | `main.py`, constantes `ARQUIVO_PROCESSADOS`, `ARQUIVO_LOG`, `MODO_TESTE` | Variaveis `MODO_TESTE` ou `TEST_MODE` | Caminhos e modo booleano definidos | Sistema de arquivos, variaveis de ambiente | Valor inesperado de modo de teste |
-| 3 | Configurar log | `configurar_log()` | `logs/bot.log` | `stdout` e `stderr` duplicados para console e log | Permissao de escrita em `logs/` | Falha ao criar diretorio ou abrir arquivo de log |
+| 3 | Configurar log | `configurar_log()` | `logs/bot.log` | `stdout` e `stderr` duplicados para console e log com timestamps `[YYYY-MM-DD HH:MM:SS]` por linha e cabecalho de execucao | Permissao de escrita em `logs/` | Falha ao criar diretorio ou abrir arquivo de log |
 | 4 | Reiniciar controle de processados | `reiniciar_emails_processados()` | `emails_processados.txt` existente ou ausente | Arquivo recriado vazio | Sistema de arquivos | Falha de permissao; perda do historico de execucoes anteriores |
 | 5 | Preparar Chrome | `main()` | Opcoes `--headless=new`, `--no-sandbox`, `--disable-dev-shm-usage`, `--window-size=1920,1080` e `--incognito` | Instancia `webdriver.Chrome` e `WebDriverWait` | Selenium, Chrome, Selenium Manager/WebDriver | Chrome ausente, driver incompativel, bloqueio do sistema operacional |
 | 6 | Validar credenciais minimas | `main()` | `URL`, `USUARIO`, `SENHA` | Execucao continua somente se todas existirem | `credenciais.env` | Navegador pode abrir antes da validacao; variavel ausente encerra o fluxo |
@@ -40,7 +40,7 @@ reenvio normalmente, mas nao registra o email processado em `emails_processados.
 | 21 | Confirmar reenvio | `clicar_item_menu("Reenviar")`, `confirmar_reenviar()` | Item e dialogo de confirmacao | Reenvio confirmado | Dialogo Prime/UI, botao com texto `Reenviar` | Confirmacao nao aparece, seletor alterado, clique falha |
 | 22 | Registrar processado ou tratado na execucao | `registrar_email_processado()` e set `emails_processados` | Email normalizado e resultado do processamento | Reenvio real grava no arquivo; skip marca o usuario em memoria nesta execucao | Sistema de arquivos, set em memoria | Falha de escrita; skip nao persiste entre execucoes |
 | 23 | Atualizar e repetir | `driver.refresh()`, `navegar_ate_em_assinatura(..., primeira_vez=False)` | Pagina atual | Tela recarregada e lista atualizada | Navegador, rede, iframe, aba | Perda de contexto, recarregamento lento, lista nao atualiza |
-| 24 | Finalizar | `finally` em `main()` | Driver e streams abertos | Navegador fechado, stdout/stderr restaurados, log fechado | Selenium, sistema de arquivos | Excecao antes de inicializar recursos; erro no fechamento |
+| 24 | Finalizar | `finally` em `main()` | Driver e streams abertos | Rodape com `Execucao finalizada em ...` no log, navegador fechado, stdout/stderr restaurados, log fechado | Selenium, sistema de arquivos | Excecao antes de inicializar recursos; erro no fechamento |
 
 ## 3. Fluxograma textual
 
@@ -117,7 +117,7 @@ reenvio normalmente, mas nao registra o email processado em `emails_processados.
 | Ponto de decisao | Condicao | Caminho A | Caminho B | Risco |
 | ---------------- | -------- | --------- | --------- | ----- |
 | Modo de teste | `MODO_TESTE` ou `TEST_MODE` em `{"1", "true", "sim", "yes"}` | Reenvia mas nao registra email no arquivo | Reenvia e registra email em `emails_processados.txt` | Valor errado pode nao filtrar reenvio real ou impedir teste |
-| Log inicial | `logs/bot.log` existe e tem tamanho maior que zero | Apenas abre em append | Escreve `Log iniciado.` | Log cresce indefinidamente |
+| Log inicial | `configurar_log()` executado | Sempre escreve cabecalho com `Execucao iniciada em ...` e separador | — | Log cresce com cabecalhos, mas ganha rastreabilidade entre execucoes |
 | Controle de processados | `emails_processados.txt` existe | Arquivo e removido e recriado | Arquivo e criado | Historico entre execucoes e perdido |
 | Credenciais minimas | `URL`, `USUARIO`, `SENHA` existem | Continua login | Registra erro e finaliza | Chrome ja foi aberto antes dessa validacao |
 | Popup existente | Selenium encontra seletor do popup dentro do timeout | Fecha popup | Continua sem fechar | Popup nao mapeado pode bloquear cliques posteriores |

@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -25,9 +26,18 @@ class TeeOutput:
         self.streams = streams
 
     def write(self, mensagem):
-        for stream in self.streams:
-            stream.write(mensagem)
-            stream.flush()
+        if not mensagem:
+            return
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        partes = mensagem.split("\n")
+        for i, parte in enumerate(partes):
+            if parte:
+                for stream in self.streams:
+                    stream.write(f"[{timestamp}] {parte}")
+            if i < len(partes) - 1:
+                for stream in self.streams:
+                    stream.write("\n")
+                    stream.flush()
 
     def flush(self):
         for stream in self.streams:
@@ -36,14 +46,16 @@ class TeeOutput:
 
 def configurar_log():
     ARQUIVO_LOG.parent.mkdir(parents=True, exist_ok=True)
-    log_estava_vazio = not ARQUIVO_LOG.exists() or ARQUIVO_LOG.stat().st_size == 0
     arquivo_log = open(ARQUIVO_LOG, "a", encoding="utf-8")
     stdout_original = sys.stdout
     stderr_original = sys.stderr
 
-    if log_estava_vazio:
-        arquivo_log.write("Log iniciado.\n")
-        arquivo_log.flush()
+    sep = "=" * 70
+    agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cabecalho = f"{sep}\n  Execucao iniciada em {agora}\n{sep}\n"
+    arquivo_log.write(cabecalho)
+    arquivo_log.flush()
+    print(cabecalho, end="")
 
     sys.stdout = TeeOutput(stdout_original, arquivo_log)
     sys.stderr = TeeOutput(stderr_original, arquivo_log)
@@ -834,6 +846,11 @@ def main():
     finally:
         if driver:
             driver.quit()
+        sep = "=" * 70
+        agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        rodape = f"\n{sep}\n  Execucao finalizada em {agora}\n{sep}\n"
+        arquivo_log.write(rodape)
+        arquivo_log.flush()
         sys.stdout = stdout_original
         sys.stderr = stderr_original
         arquivo_log.close()

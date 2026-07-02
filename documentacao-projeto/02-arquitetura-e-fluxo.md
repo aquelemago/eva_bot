@@ -14,8 +14,9 @@ Dependencias importadas:
 
 ## Funcoes principais
 
-- `configurar_log()`: cria `logs/`, abre `logs/bot.log` e duplica saida para
-  console e arquivo.
+- `configurar_log()`: cria `logs/`, abre `logs/bot.log`, escreve cabecalho com
+  timestamp da execucao e duplica saida para console e arquivo com timestamps
+  em cada linha via `TeeOutput`.
 - `reiniciar_emails_processados()`: apaga e recria `emails_processados.txt`.
 - `carregar_emails_processados()`: le emails do arquivo de controle.
 - `registrar_email_processado(email)`: adiciona email normalizado ao arquivo de
