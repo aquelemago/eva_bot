@@ -79,6 +79,7 @@ class EvabotService(win32serviceutil.ServiceFramework):
             time.sleep(min(segundos, 5))
 
     def SvcDoRun(self):
+        self.ReportServiceStatus(win32service.SERVICE_START_PENDING, waitHint=60000)
         self.ReportServiceStatus(win32service.SERVICE_RUNNING)
         self._executar_bot()
         while self._running:
