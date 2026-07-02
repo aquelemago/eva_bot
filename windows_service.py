@@ -91,5 +91,9 @@ class EvabotService(win32serviceutil.ServiceFramework):
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
-        sys.argv.extend(["install", "--start", "auto"])
-    win32serviceutil.HandleCommandLine(EvabotService)
+        print(
+            "Uso: python windows_service.py install|start|stop|remove\n"
+            "Exemplo: python windows_service.py install"
+        )
+    else:
+        win32serviceutil.HandleCommandLine(EvabotService)
