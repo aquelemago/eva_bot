@@ -2,17 +2,29 @@
 
 ## Estrutura geral
 
-O projeto e um unico script procedural em `main.py`. Nao ha pacotes internos,
-testes automatizados ou configuracao de build alem de `requirements.txt`.
+O projeto e composto por dois modulos principais:
 
-Dependencias importadas:
+- `main.py`: script procedural com toda a logica de automacao.
+- `windows_service.py`: classe do Servico do Windows que controla o ciclo de
+  vida da aplicacao (inicializacao, execucao e encerramento).
 
-- `os`, `sys`, `time`, `pathlib.Path`.
+Nao ha pacotes internos, testes automatizados ou configuracao de build alem de
+`requirements.txt`.
+
+Dependencias importadas em `main.py`:
+
+- `os`, `sys`, `time`, `threading`, `pathlib.Path`.
 - `python-dotenv` para carregar `credenciais.env`.
 - `selenium` para abrir Chrome, localizar elementos, esperar condicoes e
   disparar acoes.
 
-## Funcoes principais
+Dependencias adicionais em `windows_service.py`:
+
+- `pywin32` (`win32serviceutil`, `win32service`, `win32event`) para
+  integracao com o Service Control Manager (SCM) do Windows.
+- `threading` para executar `main()` em thread separada.
+
+## Funcoes e classes principais
 
 - `configurar_log()`: cria `logs/`, abre `logs/bot.log`, escreve cabecalho com
   timestamp da execucao e duplica saida para console e arquivo com timestamps
@@ -45,7 +57,24 @@ Dependencias importadas:
   o fluxo de detalhes, documentos enviados e reenvio para um usuario.
 - `navegar_ate_em_assinatura(driver, wait, primeira_vez=False)`: navega ate a
   tela e prepara a aba `Em assinatura`.
+- `sinalizar_parada()`: ativa o evento de parada para interromper o bot
+  graciosamente.
+- `parada_sinalizada()`: consulta se o evento de parada foi ativado.
 - `main()`: orquestra login, navegacao, loop de usuarios e finalizacao.
+- `EvabotService` (classe em `windows_service.py`): implementa o servico
+  Windows com metodos `SvcStop()` para sinalizar parada e `SvcDoRun()` para
+  iniciar `main()` em thread separada e monitorar seu ciclo de vida.
+
+## Constantes e variaveis de controle
+
+- `_SCRIPT_DIR`: caminho absoluto do diretorio onde `main.py` esta localizado,
+  usado para resolver caminhos de arquivos independentemente do diretorio de
+  trabalho.
+- `_stop_event`: `threading.Event` que sinaliza a parada do bot quando o
+  servico e interrompido.
+- `ARQUIVO_PROCESSADOS`, `ARQUIVO_LOG`: agora resolvidos com `_SCRIPT_DIR`
+  para garantir funcionamento correto em contexto de servico Windows.
+- `MODO_TESTE`: mantido inalterado.
 
 ## Fluxo de execucao
 
@@ -78,8 +107,28 @@ Dependencias importadas:
     - em modo teste, reenvia mas nao registra o email em `emails_processados.txt`;
     - em modo normal, clica `Reenviar` e confirma.
 14. Atualiza a pagina e volta para `Em assinatura`.
-15. Finaliza quando nao ha usuarios, nao ha pendentes ou ha 3 ciclos sem avanco.
-16. Fecha o navegador no `finally`.
+15. A cada iteracao do loop, verifica `parada_sinalizada()`: se o servico
+    solicitou parada, encerra o loop.
+16. Finaliza quando nao ha usuarios, nao ha pendentes, ha 3 ciclos sem avanco
+    ou a parada foi solicitada.
+17. Fecha o navegador no `finally`.
+
+## Execucao como Servico do Windows
+
+Quando executado via `windows_service.py`, o fluxo e:
+
+1. `EvabotService.SvcDoRun()` e chamado pelo Service Control Manager.
+2. Uma thread separada executa `main()` com toda a logica de automacao.
+3. A thread principal fica em loop monitorando:
+   - o evento de parada do SCM (`hWaitStop`);
+   - se a thread do bot ainda esta viva.
+4. Quando o administrador para o servico, `SvcStop()` e chamado:
+   - reporta `SERVICE_STOP_PENDING` ao SCM;
+   - aciona `sinalizar_parada()` para interromper `main()`;
+   - aciona `hWaitStop` para liberar a thread principal.
+5. A thread principal aguarda a finalizacao da thread do bot (join com 30s de
+   timeout).
+6. O servico e encerrado de forma limpa.
 
 ## Seletores importantes
 

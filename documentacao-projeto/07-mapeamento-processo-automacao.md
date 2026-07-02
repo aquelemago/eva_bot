@@ -133,6 +133,7 @@ reenvio normalmente, mas nao registra o email processado em `emails_processados.
 | Documento sem acao de reenvio | Nao ha documento `Em assinatura` | Retorna `skip_expirado` quando todos estao `Expirado` | Retorna `skip_sem_documento_acionavel` para outros casos sem documento acionavel | Skip e marcado apenas em memoria na execucao atual |
 | Confirmacao | Botao de confirmacao contem texto `Reenviar` | Confirma | Aguarda ate timeout e levanta excecao | Dialogo alterado quebra etapa final |
 | Tentativas sem avanco | `processar_usuario_em_assinatura()` retorna `False` | Incrementa contador | Reseta contador quando processa | Apos 3 falhas encerra para evitar loop |
+| Parada solicitada pelo servico | `parada_sinalizada()` retorna `True` | Encerra loop e executa cleanup | Continua processamento normal | Encerramento lento se `main()` estiver em operacao de longa duracao (ex: `time.sleep` ou `WebDriverWait`) |
 | Excecao geral | Qualquer excecao no `try` principal | Registra `Erro Critico` | Executa `finally` | Erro amplo reduz diagnostico sem traceback completo |
 
 ## 5. Dependencias externas
@@ -141,7 +142,8 @@ reenvio normalmente, mas nao registra o email processado em `emails_processados.
 | ----------- | ------------ | ------------ | ------------ | ----- |
 | Python | Execucao de `main.py` | Sim | Verificar versao e executar validacao de sintaxe | Ambiente Python incorreto |
 | `selenium` | Imports e automacao do navegador | Sim | `requirements.txt` declara `selenium`; importar em ambiente local | Versao incompativel ou ausente |
-| `python-dotenv` | `load_dotenv("credenciais.env")` | Sim | `requirements.txt` declara `python-dotenv`; importar em ambiente local | Variaveis nao carregadas |
+| `python-dotenv` | `load_dotenv()` | Sim | `requirements.txt` declara `python-dotenv`; importar em ambiente local | Variaveis nao carregadas |
+| `pywin32` | `windows_service.py` | Sim para execucao como servico | `requirements.txt` declara `pywin32`; importar em ambiente Windows | Servico nao pode ser instalado sem pywin32 |
 | Chrome | `webdriver.Chrome(options=chrome_options)` | Sim | Abrir Chrome localmente; validar Selenium Manager/WebDriver | Navegador ausente ou bloqueado |
 | WebDriver/Selenium Manager | Inicializacao do Chrome | Sim | Executar ambiente controlado com Selenium | Driver incompativel |
 | `credenciais.env` | Variaveis `URL`, `USUARIO`, `SENHA`, `MODO_TESTE` | Sim para execucao real | Confirmar existencia e chaves sem expor valores | Credencial ausente ou incorreta |
@@ -200,9 +202,10 @@ como tratado em memoria nesta execucao.
 
 ## 8. Evidencias encontradas
 
-- `main.py` carrega `credenciais.env` com `load_dotenv("credenciais.env")`.
-- `main.py` define `ARQUIVO_PROCESSADOS = Path("emails_processados.txt")` e
-  `ARQUIVO_LOG = Path("logs") / "bot.log"`.
+- `main.py` carrega `credenciais.env` com `load_dotenv()` usando caminho
+  absoluto baseado em `_SCRIPT_DIR`.
+- `main.py` define `ARQUIVO_PROCESSADOS = _SCRIPT_DIR / "emails_processados.txt"`
+  e `ARQUIVO_LOG = _SCRIPT_DIR / "logs" / "bot.log"`.
 - `main.py` interpreta `MODO_TESTE` e `TEST_MODE` como booleano por conjunto de
   valores textuais.
 - `main.py` inicia Chrome com `--headless=new`, `--no-sandbox`, `--disable-dev-shm-usage`, `--window-size=1920,1080` e `--incognito`.
@@ -222,11 +225,17 @@ como tratado em memoria nesta execucao.
   `Em assinatura` acionavel.
 - O loop principal adiciona o email do usuario ao set `emails_processados` tambem
   quando o resultado e skip, evitando repetir o mesmo usuario na execucao atual.
-- `requirements.txt` declara `selenium` e `python-dotenv`.
-- `credenciais.env.example` declara `URL`, `USUARIO`, `SENHA` e `MODO_TESTE`.
+- `requirements.txt` declara `selenium`, `python-dotenv` e `pywin32`.
+- `credenciais.env` declara `URL`, `USUARIO`, `SENHA` e `MODO_TESTE`.
 - `logs/bot.log` existe e contem registros de execucoes com finalizacao bem
   sucedida; os dados pessoais observados no log nao foram reproduzidos neste
   documento.
+- `main.py` define `_stop_event = threading.Event()` e as funcoes
+  `sinalizar_parada()` e `parada_sinalizada()` para controle de parada.
+- `main.py` verifica `parada_sinalizada()` a cada iteracao do `while True`
+  principal, interrompendo o fluxo quando o servico solicita parada.
+- `windows_service.py` implementa `EvabotService` com metodos `SvcStop()` e
+  `SvcDoRun()`, controlando o ciclo de vida da automacao como servico Windows.
 
 ## 9. Hipoteses de causa
 
@@ -245,6 +254,8 @@ como tratado em memoria nesta execucao.
 | Documento com status `Em assinatura` nao e encontrado por mudanca de texto | O filtro exige status normalizado igual a `em assinatura` e botao de acoes | Informar quais status aparecem manualmente para o documento |
 | Confirmacao de `Reenviar` mudou | `confirmar_reenviar()` procura botoes com texto `Reenviar` | Informar se o modal aparece e qual texto do botao de confirmacao |
 | Lentidao do site causa timeout | Ha combinacao de waits e sleeps fixos | Informar se a falha e intermitente e em quais horarios ocorre |
+| Servico Windows nao inicia | `pywin32` ausente ou Chrome sem perfil de usuario no contexto do servico | Verificar se `pywin32` esta instalado; configurar servico para rodar com conta de usuario com perfil Chrome |
+| Servico nao para dentro do timeout do SCM | `main()` pode estar em `WebDriverWait` ou `time.sleep` longo | Aguardar o join de 30s; se persistir, o SCM forca a parada do processo |
 
 ## 10. Informacoes necessarias para correcao
 

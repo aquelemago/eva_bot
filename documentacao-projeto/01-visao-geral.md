@@ -13,9 +13,9 @@ processado em `emails_processados.txt`.
 ## Arquivos do projeto
 
 - `main.py`: script principal, contem todo o fluxo de automacao.
-- `requirements.txt`: lista `selenium` e `python-dotenv`.
-- `credenciais.env.example`: exemplo das variaveis `URL`, `USUARIO`, `SENHA` e
-  `MODO_TESTE`.
+- `windows_service.py`: implementacao do Servico do Windows (pywin32).
+- `requirements.txt`: lista `selenium`, `python-dotenv` e `pywin32`.
+- `credenciais.env`: variaveis `URL`, `USUARIO`, `SENHA` e `MODO_TESTE`.
 - `.gitignore`: ignora credenciais, ambiente virtual, logs e arquivos de
   runtime.
 - `emails_processados.txt`: arquivo de runtime usado para registrar emails ja
@@ -25,8 +25,11 @@ processado em `emails_processados.txt`.
 
 ## Configuracao esperada
 
-O script carrega variaveis de `credenciais.env` com `load_dotenv("credenciais.env")`.
-O exemplo do projeto indica estas chaves:
+O script carrega variaveis de `credenciais.env` com `load_dotenv()`, resolvendo
+o caminho absoluto via `_SCRIPT_DIR` (baseado em `__file__`). O projeto usa
+caminhos absolutos para garantir funcionamento mesmo quando executado como
+Servico do Windows (onde o diretorio de trabalho pode ser `C:\Windows\System32`).
+As chaves esperadas sao:
 
 ```env
 URL=
@@ -46,10 +49,19 @@ Instalar dependencias em um ambiente Python:
 pip install -r requirements.txt
 ```
 
-Executar o bot:
+### Execucao direta (console)
 
 ```powershell
 python main.py
+```
+
+### Execucao como Servico do Windows (requer Windows e pywin32)
+
+```powershell
+python windows_service.py install --start auto
+python windows_service.py start
+python windows_service.py stop
+python windows_service.py remove
 ```
 
 Pre-condicoes:
@@ -68,3 +80,5 @@ Pre-condicoes:
 - Abre o Chrome em modo headless (sem janela visivel) e modo anonimo.
 - Em modo normal, clica em `Reenviar` e confirma o reenvio.
 - Em modo teste, reenvia mas nao registra o email em `emails_processados.txt`.
+- Quando executado como servico, atende ao sinal de parada do SCM: interrompe o
+  loop no proximo ciclo e executa cleanup (fecha Chrome, restaura streams, fecha log).

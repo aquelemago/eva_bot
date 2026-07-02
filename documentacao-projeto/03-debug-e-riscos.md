@@ -13,7 +13,8 @@ Resultado observado:
 ```text
 requirements.txt
 main.py
-credenciais.env.example
+windows_service.py
+credenciais.env
 ```
 
 Validacao de sintaxe:
@@ -90,6 +91,26 @@ O log agora contem timestamps `[YYYY-MM-DD HH:MM:SS]` e separadores entre execuc
    `[YYYY-MM-DD HH:MM:SS]` automaticamente em cada linha. No encerramento,
    o `finally` do `main()` escreve um rodape com "Execucao finalizada em ...".
 
+9. Caminhos de arquivo agora sao absolutos com `_SCRIPT_DIR`.
+
+   `ARQUIVO_PROCESSADOS`, `ARQUIVO_LOG` e `load_dotenv` usam
+   `Path(__file__).parent.resolve()` para garantir funcionamento
+   independentemente do diretorio de trabalho. Isso e necessario para execucao
+   como Servico do Windows, onde o CWD pode ser `C:\Windows\System32`.
+
+10. Adicionado mecanismo de parada graciosa via `threading.Event`.
+
+    As funcoes `sinalizar_parada()` e `parada_sinalizada()` em `main.py`
+    permitem que o servico interrompa o bot de forma controlada. O loop
+    principal verifica o evento a cada iteracao, e o `finally` executa o
+    cleanup completo.
+
+11. Criado `windows_service.py` para execucao como Servico do Windows.
+
+    A classe `EvabotService` gerencia o ciclo de vida usando `pywin32`. Ela
+    inicia `main()` em uma thread separada e responde ao sinal de parada do
+    SCM.
+
 ## Riscos operacionais
 
 - Reenvio duplicado se a automacao for interrompida antes de registrar o email ou
@@ -101,6 +122,13 @@ O log agora contem timestamps `[YYYY-MM-DD HH:MM:SS]` e separadores entre execuc
 - Log pode crescer indefinidamente, pois `logs/bot.log` e aberto em modo append.
   Os separadores entre execucoes e timestamps facilitam a identificacao de
   cada sessao e a busca por eventos especificos.
+- Chromedriver ou Chrome podem nao funcionar no contexto de servico Windows
+  (usuario `SYSTEM` ou `LOCAL_SERVICE` sem perfil de usuario). Recomenda-se
+  configurar o servico para executar com uma conta de usuario com perfil.
+- `pywin32` e dependencia exclusiva do Windows; `windows_service.py` nao
+  pode ser utilizado em Linux/macOS.
+- O servico depende do `_SCRIPT_DIR` para localizar `credenciais.env`; o
+  arquivo deve estar no mesmo diretorio de `main.py`.
 
 ## Comandos uteis para diagnostico futuro
 
@@ -108,6 +136,7 @@ Validar sintaxe:
 
 ```powershell
 python -m py_compile main.py
+python -m py_compile windows_service.py
 ```
 
 Ver arquivos relevantes, sem segredos:
@@ -119,11 +148,30 @@ rg --files -g "!venv/**" -g "!.git/**" -g "!__pycache__/**" -g "!logs/**" -g "!c
 Buscar pontos sensiveis no codigo:
 
 ```powershell
-rg -n "load_dotenv|os.getenv|webdriver.Chrome|WebDriverWait|time.sleep|except Exception|driver.quit|while True|execute_script|MODO_TESTE|emails_processados" main.py
+rg -n "load_dotenv|os.getenv|webdriver.Chrome|WebDriverWait|time.sleep|except Exception|driver.quit|while True|execute_script|MODO_TESTE|emails_processados|_stop_event|sinalizar_parada|parada_sinalizada" main.py
 ```
 
 Consultar erros recentes de log:
 
 ```powershell
 Select-String -Path logs\bot.log -Pattern "Erro|Critico|Falha|Nao foi possivel|Traceback|Exception" | Select-Object -Last 30
+```
+
+Gerenciar o servico Windows:
+
+```powershell
+# Instalar e configurar inicializacao automatica
+python windows_service.py install --start auto
+
+# Iniciar
+python windows_service.py start
+
+# Verificar status
+sc query Evabot
+
+# Parar
+python windows_service.py stop
+
+# Remover
+python windows_service.py remove
 ```

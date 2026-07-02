@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -14,11 +15,25 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
 
-load_dotenv("credenciais.env")
+_SCRIPT_DIR = Path(__file__).parent.resolve()
 
-ARQUIVO_PROCESSADOS = Path("emails_processados.txt")
-ARQUIVO_LOG = Path("logs") / "bot.log"
+load_dotenv(_SCRIPT_DIR / "credenciais.env")
+
+ARQUIVO_PROCESSADOS = _SCRIPT_DIR / "emails_processados.txt"
+ARQUIVO_LOG = _SCRIPT_DIR / "logs" / "bot.log"
 MODO_TESTE = os.getenv("MODO_TESTE", os.getenv("TEST_MODE", "")).strip().lower() in {"1", "true", "sim", "yes"}
+
+_stop_event = threading.Event()
+
+
+def sinalizar_parada():
+    """Sinaliza para o bot interromper a execucao de forma graciosa."""
+    _stop_event.set()
+
+
+def parada_sinalizada():
+    """Retorna True se a parada foi solicitada."""
+    return _stop_event.is_set()
 
 
 class TeeOutput:
@@ -792,6 +807,10 @@ def main():
         print(f"Emails ja registrados como processados: {len(emails_processados)}")
 
         while True:
+            if parada_sinalizada():
+                print("Parada solicitada. Encerrando execucao...")
+                break
+
             switch_to_internal_frame(driver)
             usuarios = obter_usuarios_acoes_lista(driver)
             usuarios_pendentes = [
