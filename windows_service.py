@@ -66,6 +66,7 @@ class EvabotService(win32serviceutil.ServiceFramework):
         return True
 
     def SvcDoRun(self):
+        self.ReportServiceStatus(win32service.SERVICE_RUNNING)
         while True:
             if (
                 win32event.WaitForSingleObject(self.hWaitStop, 0)
