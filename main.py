@@ -13,6 +13,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.common.exceptions import WebDriverException, InvalidSessionIdException
 
 
 _SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -48,11 +49,17 @@ class TeeOutput:
         for i, parte in enumerate(partes):
             if parte:
                 for stream in self.streams:
-                    stream.write(f"[{timestamp}] {parte}")
+                    try:
+                        stream.write(f"[{timestamp}] {parte}")
+                    except Exception:
+                        pass
             if i < len(partes) - 1:
                 for stream in self.streams:
-                    stream.write("\n")
-                    stream.flush()
+                    try:
+                        stream.write("\n")
+                        stream.flush()
+                    except Exception:
+                        pass
 
     def flush(self):
         for stream in self.streams:
@@ -90,6 +97,49 @@ def reiniciar_emails_processados():
         ARQUIVO_PROCESSADOS.unlink()
     ARQUIVO_PROCESSADOS.touch()
     print(f"Arquivo {ARQUIVO_PROCESSADOS} recriado vazio.")
+
+
+def verificar_sessao_selenium(driver):
+    """Verifica se a sessao Selenium ainda esta ativa."""
+    try:
+        _ = driver.title
+        return True
+    except (WebDriverException, InvalidSessionIdException, ConnectionRefusedError, OSError):
+        return False
+
+
+def criar_driver_chrome():
+    """Cria uma nova instancia do Chrome WebDriver com configuracoes estaveis."""
+    chrome_options = Options()
+    chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--incognito")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-software-rasterizer")
+    chrome_options.add_argument("--keep-alive-timeout=300")
+    chrome_options.add_argument("--disable-background-timer-throttling")
+    chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+    chrome_options.add_argument("--disable-renderer-backgrounding")
+    chrome_options.add_argument("--disable-features=TranslateUI,Translate")
+    chrome_options.add_argument("--disable-ipc-flooding-protection")
+    chrome_options.add_argument("--disable-hang-monitor")
+    chrome_options.add_argument("--disable-popup-blocking")
+    chrome_options.add_argument("--disable-domain-reliability")
+    chrome_options.add_argument("--disable-component-update")
+    chrome_options.add_argument("--disable-breakpad")
+    chrome_options.add_argument("--metrics-recording-only")
+    chrome_options.add_argument("--disable-sync")
+    chrome_options.add_argument("--disable-default-apps")
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-logging"])
+
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.set_page_load_timeout(60)
+    driver.implicitly_wait(10)
+    return driver
 
 
 def carregar_emails_processados():
@@ -741,11 +791,24 @@ def navegar_ate_em_assinatura(driver, wait, primeira_vez=False):
         driver.switch_to.default_content()
         for nome, by, seletor in menus:
             print(f"Abrindo: {nome}")
-            wait.until(EC.element_to_be_clickable((by, seletor))).click()
-            time.sleep(3)
+            for tentativa in range(5):
+                if not verificar_sessao_selenium(driver):
+                    raise WebDriverException("Sessao Selenium encerrada. Browser pode ter travado.")
+                try:
+                    wait.until(EC.element_to_be_clickable((by, seletor))).click()
+                    break
+                except Exception as e:
+                    if tentativa < 4:
+                        tempo_espera = 8 + (tentativa * 2)
+                        print(f"Tentativa {tentativa+1} falhou para '{nome}': {e}. Retentando em {tempo_espera}s...")
+                        time.sleep(tempo_espera)
+                        driver.switch_to.default_content()
+                    else:
+                        raise
+            time.sleep(5)
 
         print("Aguardando carregamento da aplicacao Pre-admissoes...")
-        time.sleep(10)
+        time.sleep(15)
         fechar_popup_se_existir(driver, "button.close-popup", timeout=10, nome="Popup de pre-admissoes")
 
     if not switch_to_internal_frame(driver):
@@ -768,20 +831,20 @@ def navegar_ate_em_assinatura(driver, wait, primeira_vez=False):
 
 
 def main():
+    try:
+        with open(ARQUIVO_LOG, "a", encoding="utf-8") as _diag:
+            _diag.write(f"[{datetime.now().strftime('%H:%M:%S')}] main() iniciada\n")
+            _diag.flush()
+    except Exception:
+        pass
+
     arquivo_log, stdout_original, stderr_original = configurar_log()
     driver = None
 
     try:
         reiniciar_emails_processados()
 
-        chrome_options = Options()
-        chrome_options.add_argument("--headless=new")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--incognito")
-
-        driver = webdriver.Chrome(options=chrome_options)
+        driver = criar_driver_chrome()
         wait = WebDriverWait(driver, 20)
 
         url = os.getenv("URL")
@@ -818,6 +881,28 @@ def main():
             if parada_sinalizada():
                 print("Parada solicitada. Encerrando execucao...")
                 break
+
+            if not verificar_sessao_selenium(driver):
+                print("Sessao Selenium perdida. Tentando reconectar...")
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
+                driver = criar_driver_chrome()
+                wait = WebDriverWait(driver, 20)
+                driver.get(url)
+                time.sleep(2)
+                wait.until(EC.element_to_be_clickable((By.ID, "username-input-field"))).send_keys(usuario)
+                time.sleep(1)
+                wait.until(EC.element_to_be_clickable((By.ID, "nextBtn"))).click()
+                time.sleep(2)
+                wait.until(EC.element_to_be_clickable((By.ID, "password-input-field"))).send_keys(senha)
+                time.sleep(1)
+                wait.until(EC.element_to_be_clickable((By.ID, "loginbtn"))).click()
+                time.sleep(5)
+                fechar_popup_se_existir(driver, "a.ui-dialog-titlebar-close", timeout=5, nome="Dialogo inicial")
+                navegar_ate_em_assinatura(driver, wait, primeira_vez=True)
+                continue
 
             switch_to_internal_frame(driver)
             usuarios = obter_usuarios_acoes_lista(driver)
@@ -862,19 +947,23 @@ def main():
                     break
 
             print("Atualizando a pagina e voltando para 'Em assinatura'...")
-            driver.refresh()
-            time.sleep(10)
-            navegar_ate_em_assinatura(driver, wait, primeira_vez=False)
+            if verificar_sessao_selenium(driver):
+                driver.refresh()
+                time.sleep(10)
+                navegar_ate_em_assinatura(driver, wait, primeira_vez=False)
+            else:
+                print("Sessao perdida apos processamento. Reiniciando browser...")
+                break
 
         print(f"\nTarefa finalizada! Total processado: {total_processados}")
 
-    except Exception as erro:
+    except BaseException as erro:
         import traceback
         trace = traceback.format_exc()
-        print(f"Erro Critico: {erro}\n{trace}")
         try:
-            arquivo_log.write(f"\n  ERRO: {erro}\n{trace}\n")
-            arquivo_log.flush()
+            with open(ARQUIVO_LOG, "a", encoding="utf-8") as f:
+                f.write(f"\n  ERRO: {erro}\n{trace}\n")
+                f.flush()
         except Exception:
             pass
     finally:

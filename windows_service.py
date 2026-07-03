@@ -26,10 +26,18 @@ import threading
 import time
 import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 
+_SCRIPT_DIR = Path(__file__).parent.resolve()
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
+from dotenv import load_dotenv
 import win32serviceutil  # type: ignore
 import win32service  # type: ignore
 import win32event  # type: ignore
+
+load_dotenv(_SCRIPT_DIR / "credenciais.env")
 
 _horario_raw = os.getenv("HORARIO_EXECUCAO", "7:00")
 if ":" in _horario_raw:
@@ -65,8 +73,23 @@ class EvabotService(win32serviceutil.ServiceFramework):
             return True
         return False
 
+    def _log_servico(self, msg):
+        log_path = _SCRIPT_DIR / "logs" / "bot.log"
+        try:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
+                f.flush()
+        except Exception:
+            pass
+
     def _executar_bot(self):
-        from main import main, sinalizar_parada
+        try:
+            from main import main, sinalizar_parada
+        except Exception as e:
+            self._log_servico(f"ERRO ao importar main: {e}")
+            return
+
         thread = threading.Thread(target=main, daemon=True)
         thread.start()
         while thread.is_alive():
@@ -93,11 +116,15 @@ class EvabotService(win32serviceutil.ServiceFramework):
     def SvcDoRun(self):
         self.ReportServiceStatus(win32service.SERVICE_START_PENDING, waitHint=60000)
         self.ReportServiceStatus(win32service.SERVICE_RUNNING)
-        self._executar_bot()
-        while self._running:
-            if not self._aguardar_proximo_horario():
-                break
+        self._log_servico(f"Servico iniciado. Horario: {HORARIO_EXECUCAO_HORA:02d}:{HORARIO_EXECUCAO_MIN:02d}")
+        try:
             self._executar_bot()
+            while self._running:
+                if not self._aguardar_proximo_horario():
+                    break
+                self._executar_bot()
+        except Exception as e:
+            self._log_servico(f"ERRO no SvcDoRun: {e}")
 
 
 if __name__ == "__main__":
