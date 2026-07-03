@@ -61,6 +61,14 @@ class TeeOutput:
 
 def configurar_log():
     ARQUIVO_LOG.parent.mkdir(parents=True, exist_ok=True)
+
+    if ARQUIVO_LOG.exists():
+        idade = datetime.now() - datetime.fromtimestamp(ARQUIVO_LOG.stat().st_mtime)
+        if idade.days >= 7:
+            arquivo_velho = ARQUIVO_LOG.with_suffix(f".{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+            ARQUIVO_LOG.rename(arquivo_velho)
+            print(f"Log antigo movido para {arquivo_velho.name}")
+
     arquivo_log = open(ARQUIVO_LOG, "a", encoding="utf-8")
     stdout_original = sys.stdout
     stderr_original = sys.stderr
@@ -861,7 +869,14 @@ def main():
         print(f"\nTarefa finalizada! Total processado: {total_processados}")
 
     except Exception as erro:
-        print(f"Erro Critico: {erro}")
+        import traceback
+        trace = traceback.format_exc()
+        print(f"Erro Critico: {erro}\n{trace}")
+        try:
+            arquivo_log.write(f"\n  ERRO: {erro}\n{trace}\n")
+            arquivo_log.flush()
+        except Exception:
+            pass
     finally:
         if driver:
             driver.quit()

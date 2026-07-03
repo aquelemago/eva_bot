@@ -2,7 +2,7 @@
 Servico do Windows para o Evabot.
 
 Executa a automacao imediatamente ao iniciar e repete
-diariamente as 07:00. Responde ao sinal de parada do SCM.
+diariamente no horario configurado. Responde ao sinal de parada do SCM.
 
 Uso:
     python windows_service.py install
@@ -11,19 +11,31 @@ Uso:
     python windows_service.py remove
     python windows_service.py debug
 
+Variaveis de ambiente:
+    HORARIO_EXECUCAO   Horario da execucao diaria (formato HH ou HH:MM). Padrao: 7:00.
+    Exemplos (PowerShell):
+        $env:HORARIO_EXECUCAO = "14"; python windows_service.py debug
+        $env:HORARIO_EXECUCAO = "8:30"; python windows_service.py debug
+
 Requer pywin32 instalado.
 Funciona apenas em Windows.
 """
+import math
+import os
 import threading
 import time
 import sys
 from datetime import datetime, timedelta
 
-import win32serviceutil
-import win32service
-import win32event
+import win32serviceutil  # type: ignore
+import win32service  # type: ignore
+import win32event  # type: ignore
 
-HORARIO_EXECUCAO = 7
+_horario_raw = os.getenv("HORARIO_EXECUCAO", "7:00")
+if ":" in _horario_raw:
+    HORARIO_EXECUCAO_HORA, HORARIO_EXECUCAO_MIN = int(_horario_raw.split(":")[0]), int(_horario_raw.split(":")[1])
+else:
+    HORARIO_EXECUCAO_HORA, HORARIO_EXECUCAO_MIN = int(_horario_raw), 0
 
 
 class EvabotService(win32serviceutil.ServiceFramework):
@@ -31,7 +43,7 @@ class EvabotService(win32serviceutil.ServiceFramework):
     _svc_display_name_ = "Evabot - Automacao de Reenvio de Documentos"
     _svc_description_ = (
         "Automatiza o reenvio de documentos com status 'Em assinatura' "
-        "no Senior X / HCM. Execucao diaria as 7:00."
+        f"no Senior X / HCM. Execucao diaria as {HORARIO_EXECUCAO_HORA:02d}:{HORARIO_EXECUCAO_MIN:02d}."
     )
 
     def __init__(self, args):
@@ -67,11 +79,11 @@ class EvabotService(win32serviceutil.ServiceFramework):
 
     def _aguardar_proximo_horario(self):
         agora = datetime.now()
-        alvo = agora.replace(hour=HORARIO_EXECUCAO, minute=0, second=0, microsecond=0)
+        alvo = agora.replace(hour=HORARIO_EXECUCAO_HORA, minute=HORARIO_EXECUCAO_MIN, second=0, microsecond=0)
         if alvo <= agora:
             alvo += timedelta(days=1)
         while True:
-            segundos = int((alvo - datetime.now()).total_seconds())
+            segundos = math.ceil((alvo - datetime.now()).total_seconds())
             if segundos <= 0:
                 return True
             if self._parada_solicitada():
